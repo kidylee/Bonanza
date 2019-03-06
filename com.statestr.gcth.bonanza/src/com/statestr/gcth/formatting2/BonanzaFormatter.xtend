@@ -98,7 +98,8 @@ class BonanzaFormatter extends XbaseFormatter {
 		var max = 0
 		for (field : source.fields) {
 			var name = field.name
-			max = Math.max(name.length, max)
+			var type = field.type?.name ?: ""
+			max = Math.max(name.length + type.length, max)
 		}
 
 		return max
@@ -107,9 +108,22 @@ class BonanzaFormatter extends XbaseFormatter {
 
 	private def void format(SourceField sourceField, extension IFormattableDocument document, int maxlength) {
 		val nameLength = sourceField.name.length
-
-		sourceField.regionFor.feature(BonanzaPackage.Literals.SOURCE_FIELD__NAME).append [
-			space = Strings.repeat(" ", maxlength - nameLength + 4)
+		val type = sourceField.type?.name ?: ""
+		
+		if (type !== "") {
+			sourceField.regionFor.feature(BonanzaPackage.Literals.SOURCE_FIELD__NAME).append [
+				space = " "
+			]
+			
+		}
+		
+		sourceField.regionFor.feature(BonanzaPackage.Literals.SOURCE_FIELD__PATH).prepend [
+			if(type !== ""){
+				space = Strings.repeat(" ", maxlength - nameLength - type.length + 1)
+			}else{
+				space = Strings.repeat(" ", maxlength - nameLength - type.length + 3)
+			}
+			
 		]
 	}
 

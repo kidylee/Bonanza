@@ -4,14 +4,20 @@
 package com.statestr.gcth.jvmmodel
 
 import com.google.inject.Inject
+import com.statestr.gcth.bonanza.AbstractModel
+import com.statestr.gcth.bonanza.Entity
 import com.statestr.gcth.bonanza.Model
+import com.statestr.gcth.bonanza.Source
+import org.eclipse.xtext.common.types.JvmDeclaredType
+import org.eclipse.xtext.naming.IQualifiedNameProvider
 import org.eclipse.xtext.xbase.jvmmodel.AbstractModelInferrer
 import org.eclipse.xtext.xbase.jvmmodel.IJvmDeclaredTypeAcceptor
 import org.eclipse.xtext.xbase.jvmmodel.JvmTypesBuilder
+import com.statestr.gcth.bonanza.Transform
 
 /**
  * <p>Infers a JVM model from the source model.</p> 
- *
+ * 
  * <p>The JVM model should contain all elements that would appear in the Java code 
  * which is generated from the source model. Other models link against the JVM model rather than the source model.</p>     
  */
@@ -21,6 +27,7 @@ class BonanzaJvmModelInferrer extends AbstractModelInferrer {
 	 * convenience API to build and initialize JVM types and their members.
 	 */
 	@Inject extension JvmTypesBuilder
+	@Inject extension IQualifiedNameProvider
 
 	/**
 	 * The dispatch method {@code infer} is called for each instance of the
@@ -28,11 +35,11 @@ class BonanzaJvmModelInferrer extends AbstractModelInferrer {
 	 * 
 	 * @param element
 	 *            the model to create one or more
-	 *            {@link org.eclipse.xtext.common.types.JvmDeclaredType declared
+	 *            {@link JvmDeclaredType declared
 	 *            types} from.
 	 * @param acceptor
 	 *            each created
-	 *            {@link org.eclipse.xtext.common.types.JvmDeclaredType type}
+	 *            {@link JvmDeclaredType type}
 	 *            without a container should be passed to the acceptor in order
 	 *            get attached to the current resource. The acceptor's
 	 *            {@link IJvmDeclaredTypeAcceptor#accept(org.eclipse.xtext.common.types.JvmDeclaredType)
@@ -45,18 +52,70 @@ class BonanzaJvmModelInferrer extends AbstractModelInferrer {
 	 *            rely on linking using the index if isPreIndexingPhase is
 	 *            <code>true</code>.
 	 */
-	def dispatch void infer(Model element, IJvmDeclaredTypeAcceptor acceptor, boolean isPreIndexingPhase) {
+	def dispatch void infer(Model model, IJvmDeclaredTypeAcceptor acceptor, boolean isPreIndexingPhase) {
+		model.models.filter(Transform).inferForTransforms(model.name, acceptor, isPreIndexingPhase)
+
+		for (e : model.models) {
+			e.infer(model.name, acceptor, isPreIndexingPhase)
+		}
+
+	}
+
+	def dispatch void infer(AbstractModel model, String packageName, IJvmDeclaredTypeAcceptor acceptor,
+		boolean isPreIndexingPhase) {
+		switch model {
+			case model instanceof Source: model.infer(packageName, acceptor, isPreIndexingPhase)
+			case model instanceof Entity: model.infer(packageName, acceptor, isPreIndexingPhase)
+		}
+	}
+
+	def dispatch void infer(Source source, String packageName, IJvmDeclaredTypeAcceptor acceptor,
+		boolean isPreIndexingPhase) {
 		// Here you explain how your model is mapped to Java elements, by writing the actual translation code.
-		
 		// An implementation for the initial hello world example could look like this:
-// 		acceptor.accept(element.toClass("my.company.greeting.MyGreetings")) [
-// 			for (greeting : element.greetings) {
-// 				members += greeting.toMethod("hello" + greeting.name, typeRef(String)) [
-// 					body = '''
-//						return "Hello «greeting.name»";
-//					'''
-//				]
-//			}
-//		]
+		acceptor.accept(source.toClass(packageName + "." + source.name)) [
+			for (field : source.fields) {
+
+				var type = typeRef(String)
+				if (field.type !== null) {
+					type = typeRef(field.type.fullyQualifiedName.toString)
+				}
+				members += field.toField(field.name, type)
+				members += field.toSetter(field.name, type)
+				members += field.toGetter(field.name, type)
+			}
+		]
+	}
+
+	def dispatch void infer(Entity entity, String packageName, IJvmDeclaredTypeAcceptor acceptor,
+		boolean isPreIndexingPhase) {
+		// Here you explain how your model is mapped to Java elements, by writing the actual translation code.
+		// An implementation for the initial hello world example could look like this:
+		acceptor.accept(entity.toClass(packageName + "." + entity.name)) [
+			for (field : entity.fields) {
+
+				members += field.toField(field.name, field.type)
+				members += field.toSetter(field.name, field.type)
+				members += field.toGetter(field.name, field.type)
+			}
+		]
+	}
+
+	private def void inferForTransforms(Transform[] transforms, String packageName, IJvmDeclaredTypeAcceptor acceptor,
+		boolean isPreIndexingPhase) {
+		if (transforms.size == 0) {
+			return
+		}
+		// Here you explain how your model is mapped to Java elements, by writing the actual translation code.
+		// An implementation for the initial hello world example could look like this:
+		acceptor.accept(transforms.get(0).toClass(packageName + "." + "Utils")) [
+			for (transform : transforms) {
+				members += transform.toMethod(transform.name, transform.type) [
+					parameters += transform.params
+					body = transform.body
+				]
+			}
+
+		]
 	}
 }

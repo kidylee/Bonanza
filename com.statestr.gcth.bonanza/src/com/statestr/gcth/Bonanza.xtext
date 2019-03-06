@@ -11,7 +11,7 @@ AbstractModel:
 	Source | Mapper | Entity | Transform;
 
 Source:
-	'source' name=ID '[' 'format' ':' format=SourceFormat (',' 'id' ':' sourceID=INT)? (',' 'mapper' ':'
+	'source' name=ValidID '[' 'format' ':' format=SourceFormat (',' 'id' ':' sourceID=INT)? (',' 'mapper' ':'
 	mapper=[Mapper|QualifiedName])?
 	']' '{'
 	fields+=SourceField*
@@ -21,7 +21,7 @@ enum SourceFormat:
 	XML='XML' | CSV='CSV';
 
 SourceField:
-	name=ID (':' source=[Source|QualifiedName])? path=StringOrInt;
+	name=ID (':' type=[Source|QualifiedName])? path=StringOrInt;
 
 StringOrInt:
 	XPath | CSVPosition;
@@ -33,7 +33,7 @@ CSVPosition:
 	INT;
 
 Mapper:
-	'mapper' name=ID '[' 'from' ':' source=[Source|QualifiedName] ',' 'to' ':' entity=[Entity|QualifiedName] ']' '{'
+	'mapper' name=ValidID '[' 'from' ':' source=[Source|QualifiedName] ',' 'to' ':' entity=[Entity|QualifiedName] ']' '{'
 	fields+=MapperField* '}';
 
 MapperField:
@@ -49,10 +49,10 @@ TransformParam:
 	field=[SourceField] | const=StringOrInt;
 
 EntityField:
-	name=ID type=JvmTypeReference;
+	name=ValidID type=JvmTypeReference;
 
 Entity:
-	'entity' name=ID '{' fields+=EntityField* '}';
+	'entity' name=ValidID '{' fields+=EntityField* '}';
 
 Transform:
 	'transform' type=JvmTypeReference name=ValidID '(' (params+=FullJvmFormalParameter (','

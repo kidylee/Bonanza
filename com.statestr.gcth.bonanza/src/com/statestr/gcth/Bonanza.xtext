@@ -1,0 +1,60 @@
+grammar com.statestr.gcth.Bonanza with org.eclipse.xtext.xbase.Xbase
+
+generate bonanza "http://www.statestr.com/gcth/Bonanza"
+
+Model:
+	('package' name=QualifiedName)?
+	imports+=XImportSection?
+	models+=AbstractModel*;
+
+AbstractModel:
+	Source | Mapper | Entity | Transform;
+
+Source:
+	'source' name=ID '[' 'format' ':' format=SourceFormat (',' 'id' ':' sourceID=INT)? (',' 'mapper' ':'
+	mapper=[Mapper|QualifiedName])?
+	']' '{'
+	fields+=SourceField*
+	'}';
+
+enum SourceFormat:
+	XML='XML' | CSV='CSV';
+
+SourceField:
+	name=ID (':' source=[Source|QualifiedName])? path=StringOrInt;
+
+StringOrInt:
+	XPath | CSVPosition;
+
+XPath:
+	STRING;
+
+CSVPosition:
+	INT;
+
+Mapper:
+	'mapper' name=ID '[' 'from' ':' source=[Source|QualifiedName] ',' 'to' ':' entity=[Entity|QualifiedName] ']' '{'
+	fields+=MapperField* '}';
+
+MapperField:
+	from=FromExpress '=>' to=[EntityField] ("with" ":" call=TransformCall)?;
+
+FromExpress:
+	type=[SourceField] | hardCode=StringOrInt;
+
+TransformCall:
+	transform=[Transform] '(' params+=TransformParam (',' params+=TransformParam)* ')';
+
+TransformParam:
+	field=[SourceField] | const=StringOrInt;
+
+EntityField:
+	name=ID type=JvmTypeReference;
+
+Entity:
+	'entity' name=ID '{' fields+=EntityField* '}';
+
+Transform:
+	'transform' type=JvmTypeReference name=ValidID '(' (params+=FullJvmFormalParameter (','
+	params+=FullJvmFormalParameter)*)? ')' body=XBlockExpression;
+	

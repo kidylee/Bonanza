@@ -29,5 +29,6 @@ Export-Package: com.statestr.gcth.bonanza.impl,
  com.statestr.gcth,
  com.statestr.gcth.services,
  com.statestr.gcth.validation,
- com.statestr.gcth.jvmmodel
+ com.statestr.gcth.jvmmodel,
+ com.statestr.gcth.formatting2
 Import-Package: org.apache.log4j

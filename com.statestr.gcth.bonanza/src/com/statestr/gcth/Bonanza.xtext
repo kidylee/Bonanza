@@ -37,7 +37,7 @@ Mapper:
 	fields+=MapperField* '}';
 
 MapperField:
-	from=FromExpress '=>' to=[EntityField] ("with" ":" call=TransformCall)?;
+	from=FromExpress '=>' to=[EntityField] ("with" call=TransformCall)?;
 
 FromExpress:
 	type=[SourceField] | hardCode=StringOrInt;

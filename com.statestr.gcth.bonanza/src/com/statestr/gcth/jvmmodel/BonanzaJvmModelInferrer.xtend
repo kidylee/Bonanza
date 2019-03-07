@@ -6,6 +6,8 @@ package com.statestr.gcth.jvmmodel
 import com.google.inject.Inject
 import com.statestr.gcth.bonanza.AbstractModel
 import com.statestr.gcth.bonanza.Entity
+import com.statestr.gcth.bonanza.Mapper
+import com.statestr.gcth.bonanza.MapperField
 import com.statestr.gcth.bonanza.Model
 import com.statestr.gcth.bonanza.Source
 import org.eclipse.xtext.common.types.JvmDeclaredType
@@ -13,7 +15,7 @@ import org.eclipse.xtext.naming.IQualifiedNameProvider
 import org.eclipse.xtext.xbase.jvmmodel.AbstractModelInferrer
 import org.eclipse.xtext.xbase.jvmmodel.IJvmDeclaredTypeAcceptor
 import org.eclipse.xtext.xbase.jvmmodel.JvmTypesBuilder
-import com.statestr.gcth.bonanza.Transform
+import java.math.BigDecimal
 
 /**
  * <p>Infers a JVM model from the source model.</p> 
@@ -53,8 +55,7 @@ class BonanzaJvmModelInferrer extends AbstractModelInferrer {
 	 *            <code>true</code>.
 	 */
 	def dispatch void infer(Model model, IJvmDeclaredTypeAcceptor acceptor, boolean isPreIndexingPhase) {
-		model.models.filter(Transform).inferForTransforms(model.name, acceptor, isPreIndexingPhase)
-
+//		model.models.filter(Transform).inferForTransforms(model.name, acceptor, isPreIndexingPhase)
 		for (e : model.models) {
 			e.infer(model.name, acceptor, isPreIndexingPhase)
 		}
@@ -66,6 +67,71 @@ class BonanzaJvmModelInferrer extends AbstractModelInferrer {
 		switch model {
 			case model instanceof Source: model.infer(packageName, acceptor, isPreIndexingPhase)
 			case model instanceof Entity: model.infer(packageName, acceptor, isPreIndexingPhase)
+			case model instanceof Mapper: model.infer(packageName, acceptor, isPreIndexingPhase)
+		}
+	}
+
+	def dispatch void infer(Mapper mapper, String packageName, IJvmDeclaredTypeAcceptor acceptor,
+		boolean isPreIndexingPhase) {
+		// Here you explain how your model is mapped to Java elements, by writing the actual translation code.
+		// An implementation for the initial hello world example could look like this:
+		acceptor.accept(mapper.toClass(packageName + "." + mapper.name)) [
+			val source = mapper.source
+			val target = mapper.entity
+			members += source.toField(source.name, typeRef(source.fullyQualifiedName.toString))
+			members += source.toConstructor [
+				parameters += source.toParameter(source.name, typeRef(source.fullyQualifiedName.toString))
+				body = '''
+					this.«source.name» = «source.name»;
+				'''
+			]
+
+			members += source.toMethod("get" + target.name, typeRef(target.fullyQualifiedName.toString)) [
+				body = '''
+					«typeRef(target.fullyQualifiedName.toString)» «target.name.toFirstLower» = new «typeRef(target.fullyQualifiedName.toString)»();
+					
+					«FOR f : mapper.fields»
+						«compile(f, source, target)»
+					«ENDFOR»
+					return «target.name.toFirstLower»;
+				'''
+			]
+		]
+	}
+	
+	def compile(XExpression express){
+		
+	}
+
+	def compile(MapperField field, Source source, Entity target) {
+		val from = field.from
+		val to = field.to
+		val call = field.call
+		if (call !== null) {
+			'''
+				«target.name.toFirstLower».set«to.name.toFirstUpper»(«call.compile»);
+			'''
+		} else {
+
+			if (from.hardCode !== null) {
+				'''
+					«target.name.toFirstLower».set«to.name.toFirstUpper»(«from.hardCode»);
+				'''
+			} else {
+				if (from.type !== null) {
+
+					return switch to.type.simpleName {
+						case BigDecimal.simpleName: '''
+							«target.name.toFirstLower».set«to.name.toFirstUpper»(new java.math.BigDecimal(this.«source.name».get«from.type.name»()));
+						'''
+						default: '''
+							«target.name.toFirstLower».set«to.name.toFirstUpper»(this.«source.name».get«from.type.name»());
+						'''
+					}
+
+				}
+			}
+
 		}
 	}
 
@@ -101,21 +167,4 @@ class BonanzaJvmModelInferrer extends AbstractModelInferrer {
 		]
 	}
 
-	private def void inferForTransforms(Transform[] transforms, String packageName, IJvmDeclaredTypeAcceptor acceptor,
-		boolean isPreIndexingPhase) {
-		if (transforms.size == 0) {
-			return
-		}
-		// Here you explain how your model is mapped to Java elements, by writing the actual translation code.
-		// An implementation for the initial hello world example could look like this:
-		acceptor.accept(transforms.get(0).toClass(packageName + "." + "Utils")) [
-			for (transform : transforms) {
-				members += transform.toMethod(transform.name, transform.type) [
-					parameters += transform.params
-					body = transform.body
-				]
-			}
-
-		]
-	}
 }

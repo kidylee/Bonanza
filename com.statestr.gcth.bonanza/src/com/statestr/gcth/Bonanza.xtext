@@ -1,5 +1,6 @@
 grammar com.statestr.gcth.Bonanza with org.eclipse.xtext.xbase.Xbase
 
+import "http://www.eclipse.org/xtext/common/JavaVMTypes" as types
 generate bonanza "http://www.statestr.com/gcth/Bonanza"
 
 Model:
@@ -37,7 +38,10 @@ Mapper:
 	fields+=MapperField* '}';
 
 MapperField:
-	from=FromExpress '=>' to=[EntityField] ("with" call=TransformCall)?;
+	from=FromExpress '=>' to=[EntityField] ("with" call=XExpression)?;
+
+//StaticMethodCall:
+//	class=[types::JvmIdentifiableElement] "." features;
 
 FromExpress:
 	type=[SourceField] | hardCode=StringOrInt;

@@ -28,6 +28,9 @@ class BonanzaScopeProvider extends AbstractBonanzaScopeProvider {
 
 	override getScope(EObject context, EReference reference) {
 
+		if(reference == epackage.mapperField_Call){
+			println
+		}
 		if (reference == epackage.mapperField_To) {
 			return scopeForMapperToField(context, reference)
 

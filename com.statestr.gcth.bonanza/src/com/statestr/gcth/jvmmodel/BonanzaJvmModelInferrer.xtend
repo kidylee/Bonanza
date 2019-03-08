@@ -10,12 +10,14 @@ import com.statestr.gcth.bonanza.Mapper
 import com.statestr.gcth.bonanza.MapperField
 import com.statestr.gcth.bonanza.Model
 import com.statestr.gcth.bonanza.Source
+import com.statestr.gcth.bonanza.TransformCall
+import com.statestr.gcth.bonanza.UtilClass
+import java.math.BigDecimal
 import org.eclipse.xtext.common.types.JvmDeclaredType
 import org.eclipse.xtext.naming.IQualifiedNameProvider
 import org.eclipse.xtext.xbase.jvmmodel.AbstractModelInferrer
 import org.eclipse.xtext.xbase.jvmmodel.IJvmDeclaredTypeAcceptor
 import org.eclipse.xtext.xbase.jvmmodel.JvmTypesBuilder
-import java.math.BigDecimal
 
 /**
  * <p>Infers a JVM model from the source model.</p> 
@@ -68,7 +70,25 @@ class BonanzaJvmModelInferrer extends AbstractModelInferrer {
 			case model instanceof Source: model.infer(packageName, acceptor, isPreIndexingPhase)
 			case model instanceof Entity: model.infer(packageName, acceptor, isPreIndexingPhase)
 			case model instanceof Mapper: model.infer(packageName, acceptor, isPreIndexingPhase)
+			case model instanceof UtilClass: model.infer(packageName, acceptor, isPreIndexingPhase)
 		}
+	}
+
+	def dispatch void infer(UtilClass util, String packageName, IJvmDeclaredTypeAcceptor acceptor,
+		boolean isPreIndexingPhase) {
+		acceptor.accept(util.toClass(packageName + "." + util.name)) [
+			for (t : util.transforms) {
+				members += t.toMethod(t.name, t.type) [
+					for (param : t.params) {
+						static = true
+
+						parameters += param.toParameter(param.name, param.parameterType)
+
+					}
+					body = t.body
+				]
+			}
+		]
 	}
 
 	def dispatch void infer(Mapper mapper, String packageName, IJvmDeclaredTypeAcceptor acceptor,
@@ -82,26 +102,35 @@ class BonanzaJvmModelInferrer extends AbstractModelInferrer {
 			members += source.toConstructor [
 				parameters += source.toParameter(source.name, typeRef(source.fullyQualifiedName.toString))
 				body = '''
-					this.«source.name» = «source.name»;
+					this.«source.name» = «source.name»; 
 				'''
 			]
+			if (target.name !== null) {
+				members += source.toMethod("get" + target.name, typeRef(target.fullyQualifiedName.toString)) [
+					body = '''
+						«typeRef(target.fullyQualifiedName.toString)» «target.name.toFirstLower» = new «typeRef(target.fullyQualifiedName.toString)»();
+						
+						«FOR f : mapper.fields»
+							«compile(f, source, target)»
+						«ENDFOR»
+						return «target.name.toFirstLower»;
+					'''
+				]
+			}
 
-			members += source.toMethod("get" + target.name, typeRef(target.fullyQualifiedName.toString)) [
-				body = '''
-					«typeRef(target.fullyQualifiedName.toString)» «target.name.toFirstLower» = new «typeRef(target.fullyQualifiedName.toString)»();
-					
-					«FOR f : mapper.fields»
-						«compile(f, source, target)»
-					«ENDFOR»
-					return «target.name.toFirstLower»;
-				'''
-			]
 		]
 	}
-	
-	def compile(XExpression express){
-		
+
+	def compile(TransformCall call, Source source, Entity target) {
+		'''«call.utilClass.name».«call.transform.name»(«generateParameters(call, source)»)'''
+
 	}
+
+	protected def generateParameters(TransformCall call, Source source) '''
+		«FOR param : call.params SEPARATOR ','»
+			«IF param.field !== null»this.«source.name».get«param.field.name.toFirstUpper»()«ELSE»«param.const»«ENDIF»
+		«ENDFOR»
+	'''
 
 	def compile(MapperField field, Source source, Entity target) {
 		val from = field.from
@@ -109,7 +138,7 @@ class BonanzaJvmModelInferrer extends AbstractModelInferrer {
 		val call = field.call
 		if (call !== null) {
 			'''
-				«target.name.toFirstLower».set«to.name.toFirstUpper»(«call.compile»);
+				«target.name.toFirstLower».set«to.name.toFirstUpper»(«call.compile(source, target)»);
 			'''
 		} else {
 

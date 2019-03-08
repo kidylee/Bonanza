@@ -9,7 +9,7 @@ Model:
 	models+=AbstractModel*;
 
 AbstractModel:
-	Source | Mapper | Entity | Transform;
+	Source | Mapper | Entity | UtilClass;
 
 Source:
 	'source' name=ValidID '[' 'format' ':' format=SourceFormat (',' 'id' ':' sourceID=INT)? (',' 'mapper' ':'
@@ -25,29 +25,20 @@ SourceField:
 	name=ID (':' type=[Source|QualifiedName])? path=StringOrInt;
 
 StringOrInt:
-	XPath | CSVPosition;
-
-XPath:
-	STRING;
-
-CSVPosition:
-	INT;
+	STRING | INT;
 
 Mapper:
 	'mapper' name=ValidID '[' 'from' ':' source=[Source|QualifiedName] ',' 'to' ':' entity=[Entity|QualifiedName] ']' '{'
 	fields+=MapperField* '}';
 
 MapperField:
-	from=FromExpress '=>' to=[EntityField] ("with" call=XExpression)?;
-
-//StaticMethodCall:
-//	class=[types::JvmIdentifiableElement] "." features;
+	from=FromExpress '=>' to=[EntityField] ("with" call=TransformCall)?;
 
 FromExpress:
 	type=[SourceField] | hardCode=StringOrInt;
 
 TransformCall:
-	transform=[Transform] '(' params+=TransformParam (',' params+=TransformParam)* ')';
+	utilClass=[UtilClass] "." transform=[Transform] '(' params+=TransformParam (',' params+=TransformParam)* ')';
 
 TransformParam:
 	field=[SourceField] | const=StringOrInt;
@@ -58,7 +49,10 @@ EntityField:
 Entity:
 	'entity' name=ValidID '{' fields+=EntityField* '}';
 
+UtilClass:
+	"class" name=ValidID "{" transforms+=Transform* "}";
+
 Transform:
-	'transform' type=JvmTypeReference name=ValidID '(' (params+=FullJvmFormalParameter (','
+	type=JvmTypeReference name=ValidID '(' (params+=FullJvmFormalParameter (','
 	params+=FullJvmFormalParameter)*)? ')' body=XBlockExpression;
 	

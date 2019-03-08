@@ -14,12 +14,13 @@ import com.statestr.gcth.bonanza.MapperField
 import com.statestr.gcth.bonanza.Model
 import com.statestr.gcth.bonanza.Source
 import com.statestr.gcth.bonanza.SourceField
+import com.statestr.gcth.bonanza.Transform
+import com.statestr.gcth.bonanza.UtilClass
 import com.statestr.gcth.services.BonanzaGrammarAccess
 import org.eclipse.xtext.formatting2.IFormattableDocument
 import org.eclipse.xtext.xbase.formatting2.XbaseFormatter
 
 import static extension org.eclipse.xtext.nodemodel.util.NodeModelUtils.*
-import com.statestr.gcth.bonanza.TransformCall
 
 class BonanzaFormatter extends XbaseFormatter {
 
@@ -42,6 +43,31 @@ class BonanzaFormatter extends XbaseFormatter {
 
 		}
 
+	}
+
+	def dispatch void format(UtilClass util, extension IFormattableDocument document) {
+		val open = util.regionFor.keyword(utilClassAccess.leftCurlyBracketKeyword_2)
+		val close = util.regionFor.keyword("}")
+		open.append[newLine]
+		interior(open, close)[indent]
+		val last = util.transforms.last
+		for (transform : util.transforms) {
+			transform.format
+
+			if (transform === last)
+				transform.append[newLines = 1]
+			else
+				transform.append[newLines = 2]
+		}
+	}
+
+	def dispatch void format(Transform tran, extension IFormattableDocument document) {
+		val open = tran.regionFor.keyword(transformAccess.leftParenthesisKeyword_2)
+		val close = tran.regionFor.keyword("}")
+//		open.append[newLine]
+		interior(open, close)[indent]
+
+		tran.body.format
 	}
 
 	def dispatch void format(Entity entity, extension IFormattableDocument document) {
@@ -109,21 +135,21 @@ class BonanzaFormatter extends XbaseFormatter {
 	private def void format(SourceField sourceField, extension IFormattableDocument document, int maxlength) {
 		val nameLength = sourceField.name.length
 		val type = sourceField.type?.name ?: ""
-		
+
 		if (type !== "") {
 			sourceField.regionFor.feature(BonanzaPackage.Literals.SOURCE_FIELD__NAME).append [
 				space = " "
 			]
-			
+
 		}
-		
+
 		sourceField.regionFor.feature(BonanzaPackage.Literals.SOURCE_FIELD__PATH).prepend [
-			if(type !== ""){
+			if (type !== "") {
 				space = Strings.repeat(" ", maxlength - nameLength - type.length + 1)
-			}else{
+			} else {
 				space = Strings.repeat(" ", maxlength - nameLength - type.length + 3)
 			}
-			
+
 		]
 	}
 

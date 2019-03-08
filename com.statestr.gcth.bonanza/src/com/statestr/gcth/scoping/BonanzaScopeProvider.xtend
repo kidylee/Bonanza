@@ -8,12 +8,15 @@ import com.statestr.gcth.bonanza.BonanzaPackage
 import com.statestr.gcth.bonanza.EntityField
 import com.statestr.gcth.bonanza.Mapper
 import com.statestr.gcth.bonanza.SourceField
+import com.statestr.gcth.bonanza.Transform
+import com.statestr.gcth.bonanza.TransformCall
 import org.eclipse.emf.ecore.EObject
 import org.eclipse.emf.ecore.EReference
 import org.eclipse.xtext.scoping.IScope
 import org.eclipse.xtext.scoping.Scopes
 
 import static extension org.eclipse.xtext.EcoreUtil2.*
+import org.eclipse.xtext.scoping.impl.MapBasedScope
 
 /**
  * This class contains custom scoping description.
@@ -28,22 +31,21 @@ class BonanzaScopeProvider extends AbstractBonanzaScopeProvider {
 
 	override getScope(EObject context, EReference reference) {
 
-		if(reference == epackage.mapperField_Call){
-			println
+		if (reference == epackage.transformCall_Transform) {
+			return scopeForTransform(context, reference)
 		}
 		if (reference == epackage.mapperField_To) {
 			return scopeForMapperToField(context, reference)
 
 		}
-		
+
 //		if(reference == epackage.transformCall_Transform){
 //			return scopeForMapperTransformCall(context, reference)
 //		}
-		
-		if(reference == epackage.transformParam_Field){
+		if (reference == epackage.transformParam_Field) {
 			return scopeForFromSourceField(context, reference)
 		}
-		
+
 		if ((reference == epackage.fromExpress_Type)) {
 			return scopeForFromSourceField(context, reference)
 
@@ -52,9 +54,31 @@ class BonanzaScopeProvider extends AbstractBonanzaScopeProvider {
 		super.getScope(context, reference)
 
 	}
-	
-	
-	def  protected IScope scopeForFromSourceField(EObject context, EReference reference) {
+
+	def protected IScope scopeForTransform(EObject context, EReference reference) {
+
+		return switch (context) {
+			TransformCall: {
+
+				val transforms = context?.utilClass.getAllContentsOfType(Transform)
+				if(transforms === null) return IScope.NULLSCOPE
+				Scopes.scopeFor(transforms)
+//				MapBasedScope.createScope(super.getScope(context, reference), transforms)
+			}
+			default: {
+				if(context !==null){
+					scopeForTransform(context.eContainer, reference)
+				}else{
+					return super.getScope(context, reference)
+				}
+				
+
+			}
+		}
+
+	}
+
+	def protected IScope scopeForFromSourceField(EObject context, EReference reference) {
 
 		return switch (context) {
 			Mapper: {
@@ -72,7 +96,7 @@ class BonanzaScopeProvider extends AbstractBonanzaScopeProvider {
 
 	}
 
-	def  protected IScope scopeForMapperToField(EObject context, EReference reference) {
+	def protected IScope scopeForMapperToField(EObject context, EReference reference) {
 
 		return switch (context) {
 			Mapper: {

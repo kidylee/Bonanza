@@ -30,12 +30,11 @@ class BonanzaValidator extends AbstractBonanzaValidator {
 
 		if (mapper === null) {
 			if (targetField.type.simpleName != "String") {
-				error('''Source field«sourceField» Entity field «targetField.name» is «targetField.type.type.identifier».''',
-					BonanzaPackage.eINSTANCE.mapperField_From, INVALID_TYPE)
+//				error('''Source field«sourceField» Entity field «targetField.name» is «targetField.type.type.identifier».''',
+//					BonanzaPackage.eINSTANCE.mapperField_From, INVALID_TYPE)
 			}
 		} else {
 		}
-		println(field)
 	}
 
 }

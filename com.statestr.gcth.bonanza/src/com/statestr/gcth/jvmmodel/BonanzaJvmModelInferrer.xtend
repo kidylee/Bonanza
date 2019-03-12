@@ -13,6 +13,7 @@ import com.statestr.gcth.bonanza.Source
 import com.statestr.gcth.bonanza.TransformCall
 import com.statestr.gcth.bonanza.UtilClass
 import java.math.BigDecimal
+import java.util.List
 import org.eclipse.xtext.common.types.JvmDeclaredType
 import org.eclipse.xtext.naming.IQualifiedNameProvider
 import org.eclipse.xtext.xbase.jvmmodel.AbstractModelInferrer
@@ -32,6 +33,7 @@ class BonanzaJvmModelInferrer extends AbstractModelInferrer {
 	 */
 	@Inject extension JvmTypesBuilder
 	@Inject extension IQualifiedNameProvider
+	val gcRef = GoldCopyReference.instance
 
 	/**
 	 * The dispatch method {@code infer} is called for each instance of the
@@ -128,7 +130,11 @@ class BonanzaJvmModelInferrer extends AbstractModelInferrer {
 
 	protected def generateParameters(TransformCall call, Source source) '''
 		«FOR param : call.params SEPARATOR ','»
-			«IF param.field !== null»this.«source.name».get«param.field.name.toFirstUpper»()«ELSE»«param.const»«ENDIF»
+			«IF param.field !== null»
+				this.«source.name».get«param.field.name.toFirstUpper»()
+			«ELSE»
+				«param.const»
+			«ENDIF»
 		«ENDFOR»
 	'''
 
@@ -136,6 +142,7 @@ class BonanzaJvmModelInferrer extends AbstractModelInferrer {
 		val from = field.from
 		val to = field.to
 		val call = field.call
+
 		if (call !== null) {
 			'''
 				«target.name.toFirstLower».set«to.name.toFirstUpper»(«call.compile(source, target)»);
@@ -164,22 +171,96 @@ class BonanzaJvmModelInferrer extends AbstractModelInferrer {
 		}
 	}
 
+	def boolean hasSubSource(Source source) {
+
+		return source.subsources.size != 0
+	}
+
+	def List<Source> subsources(Source source) {
+		var sub = newArrayList
+		for (f : source.fields) {
+			if (f.type !== null) {
+				sub.add(f.type)
+			}
+		}
+		return sub
+	}
+
+	def compileSource(Source source) '''
+		«IF source.sourceID != 0 »
+			«source.name» «source.name.toFirstLower» = new «source.name»(ucTxn.getRawTransaction());
+		«ENDIF»
+		
+		«IF source.mapper !== null»
+			«source.compileSourceWithMapper»
+		«ENDIF»
+			
+		«IF source.hasSubSource »
+			«FOR s: source.subsources»
+				«s.name» «s.name.toFirstLower» = «source.name.toFirstLower».get«s.name»();
+				«s.compileSource»
+			«ENDFOR»
+			
+			
+		«ENDIF»
+			
+	'''
+
+	def compileSourceWithMapper(Source source) '''
+		«val mapper = source.mapper»
+		«mapper.name» «mapper.name.toFirstLower» = new «mapper.name»(«source.name.toFirstLower»);
+		«(mapper.entity.fullyQualifiedName.toString + "DAO")» «mapper.entity.name.toFirstLower»DAO = sharedService.getService(«(mapper.entity.fullyQualifiedName.toString + "DAO")».class);
+«««		todo save failed logic
+		«mapper.entity.name.toFirstLower»DAO.save(«mapper.name.toFirstLower».get«mapper.entity.name»());
+	'''
+
 	def dispatch void infer(Source source, String packageName, IJvmDeclaredTypeAcceptor acceptor,
 		boolean isPreIndexingPhase) {
-		// Here you explain how your model is mapped to Java elements, by writing the actual translation code.
-		// An implementation for the initial hello world example could look like this:
+
+		if (source.sourceID != 0) {
+			acceptor.accept(source.toClass(packageName + "." + source.name + "Processor")) [
+
+				superTypes += typeRef(gcRef.abstractComponent)
+				superTypes += typeRef(gcRef.workflowProcessor)
+				members += source.toMethod("process", typeRef(Void.TYPE)) [
+					annotations += annotationRef(Override)
+					annotations += annotationRef(gcRef.proxyMetrics)
+					parameters += source.toParameter("ucTxn", typeRef(gcRef.useCaseTxn))
+					parameters += source.toParameter("processResource", typeRef(gcRef.processResource))
+					parameters += source.toParameter("workflowSession", typeRef(gcRef.workflowSession))
+					parameters += source.toParameter("sharedService", typeRef(gcRef.sharedServices))
+					parameters += source.toParameter("workflowControl", typeRef(gcRef.workflowControl))
+					body = '''«source.compileSource»'''
+				]
+
+			]
+		}
+
 		acceptor.accept(source.toClass(packageName + "." + source.name)) [
+
+			members += source.toField("raw", typeRef(gcRef.rawTransaction))
+			members += source.toConstructor [
+				parameters += source.toParameter("rawTransaction", typeRef(gcRef.rawTransaction))
+				body = '''this.raw = rawTransaction;'''
+			]
+
 			for (field : source.fields) {
 
-				var type = typeRef(String)
+				members += field.toField(field.name, typeRef(String))
+				members += field.toSetter(field.name, typeRef(String))
+				members += field.toGetter(field.name, typeRef(String))
 				if (field.type !== null) {
-					type = typeRef(field.type.fullyQualifiedName.toString)
+					val type = typeRef(field.type.fullyQualifiedName.toString)
+					members += field.toField(field.type.name.toFirstLower, type)
+					members += field.toMethod("get" + field.type.name.toFirstUpper, type) [
+						body = '''return this.«field.type.name.toFirstLower»;'''
+					]
 				}
-				members += field.toField(field.name, type)
-				members += field.toSetter(field.name, type)
-				members += field.toGetter(field.name, type)
+
 			}
+
 		]
+
 	}
 
 	def dispatch void infer(Entity entity, String packageName, IJvmDeclaredTypeAcceptor acceptor,
@@ -194,6 +275,16 @@ class BonanzaJvmModelInferrer extends AbstractModelInferrer {
 				members += field.toGetter(field.name, field.type)
 			}
 		]
+
+		acceptor.accept(entity.toInterface(packageName + "." + entity.name + "DAO") [
+
+			members += entity.toMethod("save", typeRef(int)) [
+				abstract = true
+				parameters += entity.toParameter(entity.name.toFirstLower, typeRef(entity.fullyQualifiedName.toString))
+
+			]
+
+		])
 	}
 
 }
